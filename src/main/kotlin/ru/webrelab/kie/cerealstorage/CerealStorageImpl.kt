@@ -21,48 +21,39 @@ class CerealStorageImpl(
     private val storage = mutableMapOf<Cereal, Float>()
 
     override fun addCereal(cereal: Cereal, amount: Float): Float {
-        if (amount < 0) throw IllegalArgumentException("Cannot add negative amount of cereal")
+        require(amount >= 0) { "Cannot add negative amount of cereal" }
+        check((cereal in storage) || (storageCapacity - storage.size * containerCapacity >= containerCapacity))
+        { "Cannot add another container" }
         val cerealAmount = (storage[cereal] ?: 0f) + amount
-        if ((cereal !in storage)
-            && (storageCapacity - storage.size * containerCapacity < containerCapacity)
-        ) throw IllegalStateException("Cannot add another container")
         storage[cereal] = minOf(cerealAmount, containerCapacity)
         return maxOf(cerealAmount - containerCapacity, 0f)
     }
 
     override fun getCereal(cereal: Cereal, amount: Float): Float {
-        if (amount < 0) throw IllegalArgumentException("Cannot get negative amount")
-        val amountObtained = storage[cereal]?.let {
+        require(amount > 0) { "Cannot get negative amount" }
+        val amountObtained = checkNotNull(storage[cereal]).let {
             if (it >= amount) amount else it
-        } ?: throw IllegalStateException("There is no such cereal in the storage")
+        }
         storage[cereal] = (storage[cereal] ?: 0f) - amountObtained
         return amountObtained
     }
 
     override fun removeContainer(cereal: Cereal): Boolean {
-        val amount = storage[cereal] ?: throw IllegalStateException("No such container")
-        if (amount == 0f) {
-            val result = storage.remove(cereal)?.let {
-                it == 0f
-            } ?: throw IllegalStateException("Failed to remove container")
-            return result
-        }
-        return false
+        val amount = checkNotNull(storage[cereal]) { "No such container" }
+        return if (amount == 0f) (checkNotNull(storage.remove(cereal)) == 0f) else false
     }
 
     override fun getAmount(cereal: Cereal): Float {
-        return storage[cereal] ?: throw IllegalStateException("There is no such container")
+        return checkNotNull(storage[cereal]) { "There is no such container" }
     }
 
     override fun getSpace(cereal: Cereal): Float {
-        return storage[cereal]?.let {
-            containerCapacity - it
-        } ?: throw IllegalStateException("There is no such container")
+        return containerCapacity - checkNotNull(storage[cereal]) { "There is no such container" }
     }
 
     override fun toString(): String {
-        val storageContent = if (!storage.isEmpty())
-            storage.entries.joinToString(separator = ", ") { "${it.key}: ${it.value}" }
+        val storageContent =
+            if (storage.isNotEmpty()) storage.entries.joinToString(separator = ", ") { "${it.key}: ${it.value}" }
             else "Storage is empty"
         return """Storage:
             |   container capacity: $containerCapacity
@@ -70,5 +61,4 @@ class CerealStorageImpl(
             |   Storage contains:
             |   $storageContent"""
     }
-
 }
